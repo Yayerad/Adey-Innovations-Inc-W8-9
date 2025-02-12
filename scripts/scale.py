@@ -1,3 +1,5 @@
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
 def scale_features(X_train, X_test, numerical_features):
     """Scale numerical features using StandardScaler."""
     scaler = StandardScaler()
