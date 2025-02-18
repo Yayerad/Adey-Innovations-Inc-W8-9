@@ -1,15 +1,47 @@
-from flask import Flask, request, jsonify
+# src/api/app.py
+import os
+import sys
+import logging
 import joblib
 import pandas as pd
 import numpy as np
-import os
-import sys
+from flask import Flask, jsonify, request
 from tensorflow.keras.models import load_model
-from .logging_config import configure_logging
+from flask.logging import default_handler
+from datetime import datetime
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.express as px
 
-# Initialize Flask app
+# Initialize Flask application
 app = Flask(__name__)
-configure_logging(app)
+
+# Configure logging
+def configure_logging():
+    """Configure logging for Flask application"""
+    # Remove default handler
+    app.logger.removeHandler(default_handler)
+    
+    # File handler
+    file_handler = logging.FileHandler('fraud_detection.log')
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s [%(pathname)s:%(lineno)d]'
+    )
+    file_handler.setFormatter(file_formatter)
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    
+    # Add handlers
+    app.logger.addHandler(file_handler)
+    app.logger.addHandler(console_handler)
+    app.logger.setLevel(logging.DEBUG)
+
+configure_logging()
 
 # Load models
 MODELS = {
@@ -53,6 +85,7 @@ def load_models():
 # Load models at startup        
 load_models()
 
+# API Endpoints
 @app.route('/predict/credit_card', methods=['POST'])
 def predict_credit_card():
     """Endpoint for credit card fraud detection"""
@@ -126,6 +159,149 @@ def predict_ecommerce():
     except Exception as e:
         app.logger.error(f"E-commerce prediction error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Dashboard Data Endpoints
+@app.route('/api/summary')
+def get_summary():
+    """Get summary statistics"""
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        df = pd.read_csv(os.path.join(base_dir, "src/data/fraud_data_processed.csv"))
+        total = len(df)
+        fraud = df['class'].sum()
+        return jsonify({
+            "total_transactions": total,
+            "total_fraud": int(fraud),
+            "fraud_percentage": (fraud/total)*100
+        })
+    except Exception as e:
+        app.logger.error(f"Summary data error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/fraud_trend')
+def get_fraud_trend():
+    """Get fraud trend over time"""
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        df = pd.read_csv(os.path.join(base_dir, "src/data/creditcard_processed.csv"))
+        df['date'] = pd.to_datetime(df['Time'], unit='s').dt.date
+        trend = df.groupby('date')['Class'].sum().reset_index()
+        return trend.rename(columns={'Class': 'fraud_cases'}).to_json(orient='records')
+    except Exception as e:
+        app.logger.error(f"Fraud trend error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/geo_fraud')
+def get_geo_fraud():
+    """Get fraud by country"""
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        df = pd.read_csv(os.path.join(base_dir, "src/data/fraud_data_processed.csv"))
+        geo = df.groupby('country')['class'].sum().reset_index()
+        return geo.rename(columns={'class': 'fraud_cases'}).to_json(orient='records')
+    except Exception as e:
+        app.logger.error(f"Geo fraud error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/device_fraud')
+def get_device_fraud():
+    """Get fraud by device"""
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        df = pd.read_csv(os.path.join(base_dir, "src/data/fraud_data_processed.csv"))
+        device = df.groupby('device_id')['class'].sum().reset_index()
+        return device.rename(columns={'class': 'fraud_cases'}).to_json(orient='records')
+    except Exception as e:
+        app.logger.error(f"Device fraud error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/browser_fraud')
+def get_browser_fraud():
+    """Get fraud by browser"""
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        df = pd.read_csv(os.path.join(base_dir, "src/data/fraud_data_processed.csv"))
+        browser_cols = [c for c in df.columns if 'browser_' in c]
+        browser = df[browser_cols].sum().reset_index()
+        browser.columns = ['browser', 'fraud_cases']
+        browser['browser'] = browser['browser'].str.replace('browser_', '')
+        return browser.to_json(orient='records')
+    except Exception as e:
+        app.logger.error(f"Browser fraud error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# Dash Application
+def init_dash_app(flask_app):
+    """Create a Dash application"""
+    dash_app = dash.Dash(
+        server=flask_app,
+        url_base_pathname='/dashboard/',
+        external_stylesheets=['/static/styles.css']
+    )
+    
+    dash_app.title = "Fraud Detection Dashboard"
+    
+    # Define layout
+    dash_app.layout = html.Div([
+        html.H1("Fraud Detection Analytics", style={'textAlign': 'center'}),
+        
+        # Summary Cards
+        html.Div([
+            html.Div(id='total-transactions-card', className='card'),
+            html.Div(id='fraud-cases-card', className='card'),
+            html.Div(id='fraud-percentage-card', className='card')
+        ], className='row'),
+        
+        # Main Charts
+        html.Div([
+            dcc.Graph(id='fraud-trend-chart', className='six columns'),
+            dcc.Graph(id='geo-map', className='six columns')
+        ], className='row'),
+        
+        # Device/Browser Charts
+        html.Div([
+            dcc.Graph(id='device-fraud-chart', className='six columns'),
+            dcc.Graph(id='browser-fraud-chart', className='six columns')
+        ], className='row'),
+        
+        dcc.Interval(
+            id='interval-component',
+            interval=60*1000,  # 1 minute
+            n_intervals=0
+        )
+    ])
+    
+    # Register callbacks
+    @dash_app.callback(
+        [Output('total-transactions-card', 'children'),
+         Output('fraud-cases-card', 'children'),
+         Output('fraud-percentage-card', 'children')],
+        [Input('interval-component', 'n_intervals')]
+    )
+    def update_summary(_):
+        response = requests.get('http://localhost:5000/api/summary')
+        data = response.json()
+        return [
+            html.Div([
+                html.H3(f"{data['total_transactions']:,}"),
+                html.P("Total Transactions")
+            ]),
+            html.Div([
+                html.H3(f"{data['total_fraud']:,}", style={'color': '#FF4B4B'}),
+                html.P("Fraud Cases")
+            ]),
+            html.Div([
+                html.H3(f"{data['fraud_percentage']:.2f}%"),
+                html.P("Fraud Percentage")
+            ])
+        ]
+    
+    # Add other callbacks similarly...
+    
+    return dash_app
+
+# Initialize Dash app
+dash_app = init_dash_app(app)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
