@@ -18,5 +18,8 @@ COPY . .
 # Expose port
 EXPOSE 5000
 
+#
+COPY src/static/ /app/src/static/
+
 # Start application
 CMD ["python", "api/app.py"]
