@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/Administrator.MMCY/OneDrive%20-%20MMCYTECH/Desktop/10a/Adey/Adey-Innovations-Inc-W8-9/mlruns/0/88bfa64220f943289a3698289969bb85/artifacts
+end_time: 1739902347964
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 88bfa64220f943289a3698289969bb85
+run_name: Explain_RandomForest
+run_uuid: 88bfa64220f943289a3698289969bb85
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1739902343999
+status: 3
+tags: []
+user_id: Yayerad.Mekonnen
