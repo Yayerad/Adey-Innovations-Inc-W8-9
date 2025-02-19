@@ -1,0 +1,13 @@
+flask
+joblib
+lime
+matplotlib
+mlflow
+numpy
+pandas
+plotly
+scikit-learn
+shap
+keras==2.11.0
+tensorflow-cpu==2.11.0
+dash==2.14.2
