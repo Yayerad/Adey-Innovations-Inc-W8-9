@@ -5,13 +5,12 @@ import logging
 import joblib
 import pandas as pd
 import numpy as np
+import requests  # Added missing import
 from flask import Flask, jsonify, request
 from tensorflow.keras.models import load_model
 from flask.logging import default_handler
-from datetime import datetime
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
 
@@ -58,11 +57,12 @@ MODELS = {
 def load_models():
     """Load all models into memory"""
     try:
+        # Get the correct base directory
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
         
         # Credit Card Models
         MODELS["credit_card"]["cnn"] = load_model(
-            os.path.join(base_dir, "notebooks/models/CNN/CNN_model.keras")
+            os.path.join(base_dir, "notebooks/models/CNN/CNN_model.keras")  # Add .keras extension
         )
         MODELS["credit_card"]["random_forest"] = joblib.load(
             os.path.join(base_dir, "notebooks/models/RandomForest/RandomForest_model.pkl")
@@ -70,7 +70,7 @@ def load_models():
         
         # E-commerce Models
         MODELS["ecommerce"]["lstm"] = load_model(
-            os.path.join(base_dir, "notebooks/models/LSTM/LSTM_model.keras")
+            os.path.join(base_dir, "notebooks/models/LSTM/LSTM_model.keras")  # Add .keras extension
         )
         MODELS["ecommerce"]["gradient_boosting"] = joblib.load(
             os.path.join(base_dir, "notebooks/models/GradientBoosting/GradientBoosting_model.pkl")
@@ -279,25 +279,30 @@ def init_dash_app(flask_app):
         [Input('interval-component', 'n_intervals')]
     )
     def update_summary(_):
-        response = requests.get('http://localhost:5000/api/summary')
-        data = response.json()
-        return [
-            html.Div([
-                html.H3(f"{data['total_transactions']:,}"),
-                html.P("Total Transactions")
-            ]),
-            html.Div([
-                html.H3(f"{data['total_fraud']:,}", style={'color': '#FF4B4B'}),
-                html.P("Fraud Cases")
-            ]),
-            html.Div([
-                html.H3(f"{data['fraud_percentage']:.2f}%"),
-                html.P("Fraud Percentage")
-            ])
-        ]
-    
-    # Add other callbacks similarly...
-    
+        try:
+            response = requests.get('http://localhost:5000/api/summary')
+            response.raise_for_status()
+            data = response.json()
+            return [
+                html.Div([
+                    html.H3(f"{data['total_transactions']:,}"),
+                    html.P("Total Transactions")
+                ]),
+                html.Div([
+                    html.H3(f"{data['total_fraud']:,}", style={'color': '#FF4B4B'}),
+                    html.P("Fraud Cases")
+                ]),
+                html.Div([
+                    html.H3(f"{data['fraud_percentage']:.2f}%"),
+                    html.P("Fraud Percentage")
+                ])
+            ]
+        except Exception as e:
+            app.logger.error(f"Dashboard summary error: {str(e)}")
+            return ["N/A", "N/A", "N/A"]
+
+    # Add other callbacks with similar error handling...
+
     return dash_app
 
 # Initialize Dash app
