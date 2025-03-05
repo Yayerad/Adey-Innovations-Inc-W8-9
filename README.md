@@ -35,6 +35,7 @@
 ├── README.md
 └── requirements.txt
 </details>
+<details>
 🚀 Getting Started
 Prerequisites
 Python 3.8+
@@ -46,6 +47,7 @@ Edit
 git clone https://github.com/yourusername/gmf-investments.git
 cd gmf-investments
 pip install -r requirements.txt
+</details>
 📊 Key Features
 📈 Time Series Forecasting
 SARIMA models for TSLA, BND, SPY
